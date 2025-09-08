@@ -253,6 +253,12 @@ const FroApp: React.FC = () => {
       setCurrentAiTask("Frô está identificando...");
       setIsLoadingIdentification(true);
       const identResult = await identifyPlant({ photoDataUri: previewUrl });
+      
+      // Robustness check: Ensure identResult is valid before proceeding
+      if (!identResult || !identResult.commonName) {
+        throw new Error("Não foi possível identificar a planta. Tente uma foto mais nítida ou de um ângulo diferente.");
+      }
+      
       setIdentification(identResult);
       setIsLoadingIdentification(false);
       toast({ title: "Planta Identificada", description: identResult.commonName });
