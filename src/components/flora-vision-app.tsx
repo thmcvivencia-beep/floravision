@@ -247,6 +247,7 @@ const FroApp: React.FC = () => {
     }
 
     resetResults();
+<<<<<<< HEAD
     
     try {
       setIsLoadingIdentification(true);
@@ -254,6 +255,16 @@ const FroApp: React.FC = () => {
       const identResult = await identifyPlant({ photoDataUri: previewUrl });
       
       if (!identResult) {
+=======
+    setIsLoadingIdentification(true);
+    setCurrentAiTask("Frô está identificando...");
+
+    try {
+      const identResult = await identifyPlant({ photoDataUri: previewUrl });
+      
+      if (!identResult || !identResult.commonName) {
+        // This case handles when the AI returns a valid (but empty or incomplete) object.
+>>>>>>> 830f4dc77db421f75f551ab11feb84a8f775f2e9
         throw new Error("Não foi possível identificar a planta. Tente uma foto mais nítida ou de um ângulo diferente.");
       }
       
@@ -268,6 +279,7 @@ const FroApp: React.FC = () => {
         photoDataUri: previewUrl,
         description: identResult.description || "Imagem da planta",
       });
+<<<<<<< HEAD
       
       if (!healthResult) {
         throw new Error("Não foi possível analisar a saúde da planta. Verifique a qualidade da imagem ou tente novamente.");
@@ -275,6 +287,12 @@ const FroApp: React.FC = () => {
 
       setHealthAnalysis(healthResult);
       
+=======
+      
+      setHealthAnalysis(healthResult);
+      setCareTips(healthResult.careTips); // Save care tips from health analysis
+      
+>>>>>>> 830f4dc77db421f75f551ab11feb84a8f775f2e9
       toast({ title: "Saúde Analisada", description: healthResult.isHealthy ? "A planta parece saudável." : "A planta pode precisar de atenção." });
 
     } catch (error: any) {
