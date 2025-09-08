@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: var(--font-body), serif; /* Updated to use CSS variable */
+}
+
+@layer base {
+  :root {
+    --background: 130 67% 96%; /* #F0FAF2 Very light green */
+    --foreground: 130 25% 25%; /* Dark Green for Text on Light Green BG */
+
+    --card: 0 0% 100%; /* White cards for contrast */
+    --card-foreground: 130 25% 25%; /* Dark Green text on cards */
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 130 25% 25%;
+
+    --primary: 129 36% 74%; /* #A7D1AB Soft Green */
+    --primary-foreground: 130 25% 15%; /* Very Dark Green for text on Primary buttons */
+
+    --secondary: 130 40% 90%; /* Lighter shade of green for secondary elements */
+    --secondary-foreground: 130 25% 20%; /* Dark green for text on secondary */
+
+    --muted: 130 40% 92%; /* Muted light green */
+    --muted-foreground: 130 20% 45%; /* Muted dark green text */
+
+    --accent: 47 87% 44%; /* #D4AC0D Muted Yellow */
+    --accent-foreground: 0 0% 100%; /* White text on Accent for good contrast */
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 130 30% 88%; /* Light green border */
+    --input: 0 0% 100%; /* White input background */
+    --ring: 129 36% 65%; /* Darker shade of primary for focus ring */
+
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+
+    /* Sidebar variables - can remain default or be themed similarly if sidebar is used */
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    /* Define dark theme if needed, for now focusing on light theme */
+    --background: 130 10% 10%;
+    --foreground: 130 25% 90%;
+
+    --card: 130 10% 15%;
+    --card-foreground: 130 25% 90%;
+
+    --popover: 130 10% 15%;
+    --popover-foreground: 130 25% 90%;
+
+    --primary: 129 36% 74%;
+    --primary-foreground: 130 25% 15%;
+
+    --secondary: 130 15% 25%;
+    --secondary-foreground: 130 25% 90%;
+
+    --muted: 130 15% 20%;
+    --muted-foreground: 130 20% 60%;
+
+    --accent: 47 87% 44%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 130 20% 30%;
+    --input: 130 10% 20%;
+    --ring: 129 36% 65%;
+
+    /* Sidebar dark variables */
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1,"calt" 1; /* Common practice for better typography */
+  }
+}
