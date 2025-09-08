@@ -248,14 +248,14 @@ const FroApp: React.FC = () => {
     }
 
     resetResults();
+    setIsLoadingIdentification(true);
+    setCurrentAiTask("Frô está identificando...");
 
     try {
-      setCurrentAiTask("Frô está identificando...");
-      setIsLoadingIdentification(true);
       const identResult = await identifyPlant({ photoDataUri: previewUrl });
       
-      // Robustness check: Ensure identResult is valid before proceeding
       if (!identResult || !identResult.commonName) {
+        // This case handles when the AI returns a valid (but empty or incomplete) object.
         throw new Error("Não foi possível identificar a planta. Tente uma foto mais nítida ou de um ângulo diferente.");
       }
       
@@ -265,20 +265,23 @@ const FroApp: React.FC = () => {
 
       setCurrentAiTask("Frô está analisando a saúde...");
       setIsLoadingHealthAnalysis(true);
+      
       const healthResult = await analyzePlantHealth({
         photoDataUri: previewUrl,
         description: identResult.description || "Imagem da planta",
       });
+      
       setHealthAnalysis(healthResult);
       setCareTips(healthResult.careTips); // Save care tips from health analysis
-      setIsLoadingHealthAnalysis(false);
-      toast({ title: "Saúde Analisada", description: healthResult.isHealthy ? "A planta parece saudável." : "A planta pode precisar de atenção." });
       
+      toast({ title: "Saúde Analisada", description: healthResult.isHealthy ? "A planta parece saudável." : "A planta pode precisar de atenção." });
+
     } catch (error: any) {
       console.error("Análise falhou:", error);
+      const errorMessage = error.message || "Ocorreu um erro inesperado durante a análise. Verifique sua conexão ou a chave de API.";
       toast({
         title: "Análise Falhou",
-        description: error.message || "Ocorreu um erro inesperado durante a análise.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
