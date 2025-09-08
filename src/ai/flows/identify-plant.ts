@@ -29,7 +29,7 @@ const IdentifyPlantOutputSchema = z.object({
 });
 export type IdentifyPlantOutput = z.infer<typeof IdentifyPlantOutputSchema>;
 
-export async function identifyPlant(input: IdentifyPlantInput): Promise<IdentifyPlantOutput> {
+export async function identifyPlant(input: IdentifyPlantInput): Promise<IdentifyPlantOutput | null> {
   return identifyPlantFlow(input);
 }
 
@@ -51,10 +51,16 @@ const identifyPlantFlow = ai.defineFlow(
   {
     name: 'identifyPlantFlow',
     inputSchema: IdentifyPlantInputSchema,
-    outputSchema: IdentifyPlantOutputSchema,
+    outputSchema: z.nullable(IdentifyPlantOutputSchema),
   },
   async input => {
-    const {output} = await identifyPlantPrompt(input);
-    return output!;
+    try {
+      const {output} = await identifyPlantPrompt(input);
+      return output;
+    } catch (error) {
+      console.error("Erro no fluxo 'identifyPlantFlow':", error);
+      // Retorna null para que o frontend possa tratar a falha sem quebrar a aplicação.
+      return null;
+    }
   }
 );

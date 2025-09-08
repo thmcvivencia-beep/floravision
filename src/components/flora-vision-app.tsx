@@ -22,8 +22,7 @@ const FroApp: React.FC = () => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [identification, setIdentification] = useState<IdentifyPlantOutput | null>(null);
   const [healthAnalysis, setHealthAnalysis] = useState<AnalyzePlantHealthOutput | null>(null);
-  const [careTips, setCareTips] = useState<string | null>(null);
-
+  
   const [isLoadingIdentification, setIsLoadingIdentification] = useState(false);
   const [isLoadingHealthAnalysis, setIsLoadingHealthAnalysis] = useState(false);
   const [isCapturingPhoto, setIsCapturingPhoto] = useState(false);
@@ -60,16 +59,17 @@ const FroApp: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // This effect now only handles cleanup of object URLs to prevent memory leaks.
+    // Cleanup the preview URL when the component unmounts
+    let url = previewUrl;
     return () => {
-      if (previewUrl && previewUrl.startsWith("blob:")) {
-        URL.revokeObjectURL(previewUrl);
+      if (url && url.startsWith("blob:")) {
+        URL.revokeObjectURL(url);
       }
     };
   }, [previewUrl]);
 
   useEffect(() => {
-    // This effect handles stopping the video stream when the component unmounts.
+    // Cleanup video stream when component unmounts
     return () => {
       stopVideoStream();
     };
@@ -88,7 +88,6 @@ const FroApp: React.FC = () => {
   const resetResults = () => {
     setIdentification(null);
     setHealthAnalysis(null);
-    setCareTips(null);
     setCurrentAiTask(null);
   }
 
@@ -97,7 +96,7 @@ const FroApp: React.FC = () => {
     stopVideoStream();
     const file = event.target.files?.[0];
     if (file) {
-      if (previewUrl && previewUrl.startsWith("blob:") && !previewUrl.startsWith("data:")) {
+      if (previewUrl && previewUrl.startsWith("blob:")) {
         URL.revokeObjectURL(previewUrl);
       }
       setSelectedFile(file);
@@ -184,7 +183,7 @@ const FroApp: React.FC = () => {
     if (open) {
       setHasCameraPermission(null);
       setSelectedFile(null);
-      if (previewUrl && previewUrl.startsWith("blob:") && !previewUrl.startsWith("data:")) {
+      if (previewUrl && previewUrl.startsWith("blob:")) {
         URL.revokeObjectURL(previewUrl);
       }
       setPreviewUrl(null); 
@@ -222,7 +221,7 @@ const FroApp: React.FC = () => {
     if (context) {
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       const dataUri = canvas.toDataURL('image/jpeg');
-      if (previewUrl && previewUrl.startsWith("blob:") && !previewUrl.startsWith("data:")) {
+      if (previewUrl && previewUrl.startsWith("blob:")) {
          URL.revokeObjectURL(previewUrl);
       }
       setPreviewUrl(dataUri); 
@@ -248,31 +247,42 @@ const FroApp: React.FC = () => {
     }
 
     resetResults();
-
+    
     try {
-      setCurrentAiTask("Frô está identificando...");
       setIsLoadingIdentification(true);
+      setCurrentAiTask("Frô está identificando...");
       const identResult = await identifyPlant({ photoDataUri: previewUrl });
+      
+      if (!identResult) {
+        throw new Error("Não foi possível identificar a planta. Tente uma foto mais nítida ou de um ângulo diferente.");
+      }
+      
       setIdentification(identResult);
       setIsLoadingIdentification(false);
       toast({ title: "Planta Identificada", description: identResult.commonName });
 
       setCurrentAiTask("Frô está analisando a saúde...");
       setIsLoadingHealthAnalysis(true);
+      
       const healthResult = await analyzePlantHealth({
         photoDataUri: previewUrl,
         description: identResult.description || "Imagem da planta",
       });
-      setHealthAnalysis(healthResult);
-      setCareTips(healthResult.careTips); // Save care tips from health analysis
-      setIsLoadingHealthAnalysis(false);
-      toast({ title: "Saúde Analisada", description: healthResult.isHealthy ? "A planta parece saudável." : "A planta pode precisar de atenção." });
       
+      if (!healthResult) {
+        throw new Error("Não foi possível analisar a saúde da planta. Verifique a qualidade da imagem ou tente novamente.");
+      }
+
+      setHealthAnalysis(healthResult);
+      
+      toast({ title: "Saúde Analisada", description: healthResult.isHealthy ? "A planta parece saudável." : "A planta pode precisar de atenção." });
+
     } catch (error: any) {
       console.error("Análise falhou:", error);
+      const errorMessage = error.message || "Ocorreu um erro inesperado durante a análise. Verifique sua conexão ou a chave de API.";
       toast({
         title: "Análise Falhou",
-        description: error.message || "Ocorreu um erro inesperado durante a análise.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -284,7 +294,7 @@ const FroApp: React.FC = () => {
 
   const handleClear = () => {
     setSelectedFile(null);
-    if (previewUrl && previewUrl.startsWith("blob:") && !previewUrl.startsWith("data:")) {
+    if (previewUrl && previewUrl.startsWith("blob:")) {
       URL.revokeObjectURL(previewUrl);
     }
     setPreviewUrl(null);
@@ -493,10 +503,10 @@ const FroApp: React.FC = () => {
               <strong className="font-medium">Diagnóstico:</strong>
               <p className="text-muted-foreground mt-1">{healthAnalysis.diagnosis}</p>
             </div>
-            {careTips && (
+            {healthAnalysis.careTips && (
               <div>
                 <strong className="font-medium">Conselhos Imediatos de Cuidado:</strong>
-                <p className="text-muted-foreground mt-1">{careTips}</p>
+                <p className="text-muted-foreground mt-1">{healthAnalysis.careTips}</p>
               </div>
             )}
           </CardContent>

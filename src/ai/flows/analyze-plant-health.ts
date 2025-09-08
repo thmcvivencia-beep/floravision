@@ -29,7 +29,7 @@ const AnalyzePlantHealthOutputSchema = z.object({
 });
 export type AnalyzePlantHealthOutput = z.infer<typeof AnalyzePlantHealthOutputSchema>;
 
-export async function analyzePlantHealth(input: AnalyzePlantHealthInput): Promise<AnalyzePlantHealthOutput> {
+export async function analyzePlantHealth(input: AnalyzePlantHealthInput): Promise<AnalyzePlantHealthOutput | null> {
   return analyzePlantHealthFlow(input);
 }
 
@@ -53,10 +53,16 @@ const analyzePlantHealthFlow = ai.defineFlow(
   {
     name: 'analyzePlantHealthFlow',
     inputSchema: AnalyzePlantHealthInputSchema,
-    outputSchema: AnalyzePlantHealthOutputSchema,
+    outputSchema: z.nullable(AnalyzePlantHealthOutputSchema),
   },
   async input => {
-    const {output} = await analyzePlantHealthPrompt(input);
-    return output!;
+    try {
+      const {output} = await analyzePlantHealthPrompt(input);
+      return output;
+    } catch (error) {
+      console.error("Erro no fluxo 'analyzePlantHealthFlow':", error);
+      // Retorna null para que o frontend possa tratar a falha sem quebrar a aplicação.
+      return null;
+    }
   }
 );
