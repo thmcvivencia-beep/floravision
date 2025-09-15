@@ -8,12 +8,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { identifyPlant, type IdentifyPlantOutput } from "@/ai/flows/identify-plant";
 import { analyzePlantHealth, type AnalyzePlantHealthOutput } from "@/ai/flows/analyze-plant-health";
-import { Leaf, HeartPulse, Sparkles, Bot, Loader2, Image as ImageIcon, XCircle, Camera, AlertTriangle, SwitchCamera } from "lucide-react";
+import { Leaf, HeartPulse, Bot, Loader2, Image as ImageIcon, XCircle, Camera, SwitchCamera } from "lucide-react";
 import { cn } from "@/lib/utils";
 import TutorialDialog from "./tutorial-dialog";
 
@@ -23,12 +22,9 @@ const FroApp: React.FC = () => {
   const [identification, setIdentification] = useState<IdentifyPlantOutput | null>(null);
   const [healthAnalysis, setHealthAnalysis] = useState<AnalyzePlantHealthOutput | null>(null);
   
-  const [isLoadingIdentification, setIsLoadingIdentification] = useState(false);
-  const [isLoadingHealthAnalysis, setIsLoadingHealthAnalysis] = useState(false);
-  const [isCapturingPhoto, setIsCapturingPhoto] = useState(false);
-  
+  const [isLoading, setIsLoading] = useState(false);
   const [currentAiTask, setCurrentAiTask] = useState<string | null>(null);
-
+  
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -210,7 +206,8 @@ const FroApp: React.FC = () => {
   const handleCapturePhoto = async () => {
     if (!videoRef.current || !canvasRef.current ) return;
     
-    setIsCapturingPhoto(true);
+    setIsLoading(true);
+    setCurrentAiTask("Capturando...");
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -232,7 +229,8 @@ const FroApp: React.FC = () => {
     }
     
     setIsCameraDialogOpen(false); 
-    setIsCapturingPhoto(false);
+    setIsLoading(false);
+    setCurrentAiTask(null);
   };
 
 
@@ -247,65 +245,36 @@ const FroApp: React.FC = () => {
     }
 
     resetResults();
-<<<<<<< HEAD
+    setIsLoading(true);
     
     try {
-      setIsLoadingIdentification(true);
       setCurrentAiTask("Frô está identificando...");
       const identResult = await identifyPlant({ photoDataUri: previewUrl });
       
-      if (!identResult) {
-=======
-    setIsLoadingIdentification(true);
-    setCurrentAiTask("Frô está identificando...");
-
-    try {
-      const identResult = await identifyPlant({ photoDataUri: previewUrl });
-      
-      if (!identResult || !identResult.commonName) {
-        // This case handles when the AI returns a valid (but empty or incomplete) object.
->>>>>>> 830f4dc77db421f75f551ab11feb84a8f775f2e9
-        throw new Error("Não foi possível identificar a planta. Tente uma foto mais nítida ou de um ângulo diferente.");
-      }
-      
       setIdentification(identResult);
-      setIsLoadingIdentification(false);
       toast({ title: "Planta Identificada", description: identResult.commonName });
 
       setCurrentAiTask("Frô está analisando a saúde...");
-      setIsLoadingHealthAnalysis(true);
       
       const healthResult = await analyzePlantHealth({
         photoDataUri: previewUrl,
         description: identResult.description || "Imagem da planta",
       });
-<<<<<<< HEAD
-      
-      if (!healthResult) {
-        throw new Error("Não foi possível analisar a saúde da planta. Verifique a qualidade da imagem ou tente novamente.");
-      }
-
-      setHealthAnalysis(healthResult);
-      
-=======
       
       setHealthAnalysis(healthResult);
-      setCareTips(healthResult.careTips); // Save care tips from health analysis
       
->>>>>>> 830f4dc77db421f75f551ab11feb84a8f775f2e9
       toast({ title: "Saúde Analisada", description: healthResult.isHealthy ? "A planta parece saudável." : "A planta pode precisar de atenção." });
 
     } catch (error: any) {
       console.error("Análise falhou:", error);
-      const errorMessage = error.message || "Ocorreu um erro inesperado durante a análise. Verifique sua conexão ou a chave de API.";
+      const errorMessage = "Não foi possível analisar a imagem. Tente uma foto mais nítida ou de um ângulo diferente. Verifique também sua chave de API e a conexão.";
       toast({
         title: "Análise Falhou",
         description: errorMessage,
         variant: "destructive",
       });
     } finally {
-      setIsLoadingIdentification(false);
-      setIsLoadingHealthAnalysis(false);
+      setIsLoading(false);
       setCurrentAiTask(null);
     }
   };
@@ -326,8 +295,6 @@ const FroApp: React.FC = () => {
       fileInputRef.current.value = '';
     }
   };
-  
-  const isLoading = isLoadingIdentification || isLoadingHealthAnalysis || isCapturingPhoto;
 
   return (
     <div className="space-y-8">
@@ -399,7 +366,7 @@ const FroApp: React.FC = () => {
               <DialogFooter className="mt-4 gap-2 sm:gap-0 flex-col sm:flex-row sm:justify-between">
                 <div className="flex gap-2">
                   {availableCameras.length > 1 && hasCameraPermission && (
-                    <Button onClick={handleSwitchCamera} variant="secondary" disabled={isLoading || isCapturingPhoto}>
+                    <Button onClick={handleSwitchCamera} variant="secondary" disabled={isLoading}>
                       <SwitchCamera className="mr-2 h-5 w-5" /> Trocar Câmera
                     </Button>
                   )}
@@ -410,8 +377,8 @@ const FroApp: React.FC = () => {
                       Cancelar
                     </Button>
                   </DialogClose>
-                  <Button onClick={handleCapturePhoto} disabled={isLoading || isCapturingPhoto || !hasCameraPermission}>
-                    {isCapturingPhoto ? (
+                  <Button onClick={handleCapturePhoto} disabled={isLoading || !hasCameraPermission}>
+                    {isLoading && currentAiTask === 'Capturando...' ? (
                       <>
                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                         Capturando...
@@ -461,7 +428,7 @@ const FroApp: React.FC = () => {
             size="lg"
             className="w-full sm:w-auto"
           >
-            {isLoading && !isCapturingPhoto ? (
+            {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                 {currentAiTask || "Analisando..."}
