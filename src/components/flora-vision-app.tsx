@@ -5,10 +5,8 @@ import Image from "next/image";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogClose, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { identifyPlant, type IdentifyPlantOutput } from "@/ai/flows/identify-plant";
 import { analyzePlantHealth, type AnalyzePlantHealthOutput } from "@/ai/flows/analyze-plant-health";
@@ -17,7 +15,6 @@ import { cn } from "@/lib/utils";
 import TutorialDialog from "./tutorial-dialog";
 
 const FroApp: React.FC = () => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [identification, setIdentification] = useState<IdentifyPlantOutput | null>(null);
   const [healthAnalysis, setHealthAnalysis] = useState<AnalyzePlantHealthOutput | null>(null);
@@ -28,13 +25,13 @@ const FroApp: React.FC = () => {
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
   const [currentCameraIndex, setCurrentCameraIndex] = useState<number>(0);
   const [isCameraDialogOpen, setIsCameraDialogOpen] = useState(false);
-  const [showUploadFallback, setShowUploadFallback] = useState(false);
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+
+  const { toast } = useToast();
 
   useEffect(() => {
     // ComponentDidMount: Check if the tutorial has been seen.
@@ -44,8 +41,6 @@ const FroApp: React.FC = () => {
     }
   }, []);
 
-  const { toast } = useToast();
-
   const stopVideoStream = useCallback(() => {
     if (videoRef.current && videoRef.current.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
@@ -54,202 +49,21 @@ const FroApp: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => {
-    // Cleanup the preview URL when the component unmounts
-    let url = previewUrl;
-    return () => {
-      if (url && url.startsWith("blob:")) {
-        URL.revokeObjectURL(url);
-      }
-    };
-  }, [previewUrl]);
-
-  useEffect(() => {
-    // Cleanup video stream when component unmounts
-    return () => {
-      stopVideoStream();
-    };
-  }, [stopVideoStream]);
-
-
-  const fileToDataUri = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (error) => reject(error);
-      reader.readAsDataURL(file);
-    });
-  };
-
   const resetResults = () => {
     setIdentification(null);
     setHealthAnalysis(null);
-    setCurrentAiTask(null);
-  }
-
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (showUploadFallback) setShowUploadFallback(false);
-    stopVideoStream();
-    const file = event.target.files?.[0];
-    if (file) {
-      if (previewUrl && previewUrl.startsWith("blob:")) {
-        URL.revokeObjectURL(previewUrl);
-      }
-      setSelectedFile(file);
-      try {
-        const dataUri = await fileToDataUri(file);
-        setPreviewUrl(dataUri);
-      } catch (error) {
-        toast({
-          title: "Erro",
-          description: "Falha ao ler o arquivo.",
-          variant: "destructive",
-        });
-        setSelectedFile(null);
-        setPreviewUrl(null);
-      }
-      resetResults();
-    }
   };
 
-  const startVideoStream = useCallback(async (deviceId?: string) => {
-    stopVideoStream();
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      toast({
-        title: "Erro de Câmera",
-        description: "Seu navegador não suporta acesso à câmera. Por favor, envie um arquivo.",
-        variant: "destructive",
-      });
-      setHasCameraPermission(false);
-      setIsCameraDialogOpen(false);
-      setShowUploadFallback(true);
-      return;
-    }
-  
-    setHasCameraPermission(null);
-  
-    const getStream = async (constraints: MediaStreamConstraints) => {
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      setHasCameraPermission(true);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-  
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter((device) => device.kind === 'videoinput');
-      setAvailableCameras(videoDevices);
-  
-      const currentStreamDeviceId = stream.getVideoTracks()[0]?.getSettings().deviceId;
-      if (currentStreamDeviceId) {
-        const currentIndex = videoDevices.findIndex(device => device.deviceId === currentStreamDeviceId);
-        if (currentIndex !== -1) {
-          setCurrentCameraIndex(currentIndex);
-        }
-      } else if (videoDevices.length > 0) {
-        setCurrentCameraIndex(0);
-      }
-    };
-  
-    try {
-      if (deviceId) {
-        await getStream({ video: { deviceId: { exact: deviceId } } });
-      } else {
-        try {
-          await getStream({ video: { facingMode: 'environment' } });
-        } catch (err) {
-          console.warn("Falha ao obter a câmera traseira, tentando a padrão.", err);
-          await getStream({ video: true });
-        }
-      }
-    } catch (error) {
-      console.error("Erro ao acessar a câmera:", error);
-      setHasCameraPermission(false);
-      toast({
-        variant: "destructive",
-        title: "Acesso à Câmera Negado",
-        description: "Por favor, habilite as permissões da câmera ou use a opção de envio de arquivo.",
-      });
-      setIsCameraDialogOpen(false);
-      setShowUploadFallback(true);
-    }
-  }, [stopVideoStream, toast]);
-  
-  const handleDialogCameraOpenChange = (open: boolean) => {
-    setIsCameraDialogOpen(open);
-    if (open) {
-      setHasCameraPermission(null);
-      setSelectedFile(null);
-      if (previewUrl && previewUrl.startsWith("blob:")) {
-        URL.revokeObjectURL(previewUrl);
-      }
-      setPreviewUrl(null); 
-      resetResults();
-      startVideoStream();
-    } else {
-      stopVideoStream();
-    }
-  };
-  
-  const handleSwitchCamera = async () => {
-    if (availableCameras.length > 1) {
-      const nextCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
-      const nextCamera = availableCameras[nextCameraIndex];
-      await startVideoStream(nextCamera.deviceId);
-    } else {
-      toast({
-        title: "Câmera Única",
-        description: "Apenas uma câmera foi detectada.",
-      });
-    }
-  };
-
-  const handleCapturePhoto = async () => {
-    if (!videoRef.current || !canvasRef.current ) return;
-    
-    setIsLoading(true);
-    setCurrentAiTask("Capturando...");
-
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const context = canvas.getContext('2d');
-    
-    if (context) {
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const dataUri = canvas.toDataURL('image/jpeg');
-      if (previewUrl && previewUrl.startsWith("blob:")) {
-         URL.revokeObjectURL(previewUrl);
-      }
-      setPreviewUrl(dataUri); 
-      setSelectedFile(null); 
-      toast({ title: "Foto Capturada", description: "A imagem da câmera foi capturada." });
-    } else {
-       toast({ title: "Erro ao Capturar", description: "Não foi possível processar a imagem da câmera.", variant: "destructive" });
-    }
-    
-    setIsCameraDialogOpen(false); 
-    setIsLoading(false);
-    setCurrentAiTask(null);
-  };
-
-
-  const handleAnalyze = async () => {
-    if (!previewUrl) { 
-      toast({
-        title: "Nenhuma Imagem",
-        description: "Por favor, envie uma foto da planta ou capture uma com a câmera.",
-        variant: "destructive",
-      });
-      return;
-    }
-
+  const handleAnalyze = async (dataUri: string) => {
     resetResults();
     setIsLoading(true);
     
     try {
       setCurrentAiTask("Frô está identificando...");
-      const identResult = await identifyPlant({ photoDataUri: previewUrl });
+      const identResult = await identifyPlant({ photoDataUri: dataUri });
+      if (!identResult?.commonName) {
+        throw new Error("A identificação da planta falhou ou retornou um resultado inválido.");
+      }
       
       setIdentification(identResult);
       toast({ title: "Planta Identificada", description: identResult.commonName });
@@ -257,12 +71,14 @@ const FroApp: React.FC = () => {
       setCurrentAiTask("Frô está analisando a saúde...");
       
       const healthResult = await analyzePlantHealth({
-        photoDataUri: previewUrl,
+        photoDataUri: dataUri,
         description: identResult.description || "Imagem da planta",
       });
-      
+      if (!healthResult) {
+         throw new Error("A análise de saúde falhou ou retornou um resultado inválido.");
+      }
+
       setHealthAnalysis(healthResult);
-      
       toast({ title: "Saúde Analisada", description: healthResult.isHealthy ? "A planta parece saudável." : "A planta pode precisar de atenção." });
 
     } catch (error: any) {
@@ -273,27 +89,119 @@ const FroApp: React.FC = () => {
         description: errorMessage,
         variant: "destructive",
       });
+      // Clear results if analysis fails
+      handleClear();
     } finally {
       setIsLoading(false);
       setCurrentAiTask(null);
     }
   };
 
+  const startVideoStream = useCallback(async (deviceId?: string) => {
+    stopVideoStream();
+    setHasCameraPermission(null);
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      toast({
+        title: "Erro de Câmera",
+        description: "Seu navegador não suporta acesso à câmera.",
+        variant: "destructive",
+      });
+      setIsCameraDialogOpen(false);
+      return;
+    }
+
+    const constraints = deviceId 
+      ? { video: { deviceId: { exact: deviceId } } }
+      : { video: { facingMode: 'environment' } };
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      setHasCameraPermission(true);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter((device) => device.kind === 'videoinput');
+      setAvailableCameras(videoDevices);
+      const currentStreamDeviceId = stream.getVideoTracks()[0]?.getSettings().deviceId;
+      const currentIndex = videoDevices.findIndex(device => device.deviceId === currentStreamDeviceId);
+      setCurrentCameraIndex(currentIndex > -1 ? currentIndex : 0);
+    } catch (error) {
+       console.error("Erro ao acessar a câmera, tentando fallback:", error);
+       try {
+         // Fallback to any available camera
+         const stream = await navigator.mediaDevices.getUserMedia({video: true});
+         setHasCameraPermission(true);
+         if (videoRef.current) videoRef.current.srcObject = stream;
+       } catch (fallbackError) {
+         console.error("Erro no fallback da câmera:", fallbackError);
+         setHasCameraPermission(false);
+         toast({
+           variant: "destructive",
+           title: "Acesso à Câmera Negado",
+           description: "Por favor, habilite as permissões da câmera nas configurações do seu navegador.",
+         });
+         setIsCameraDialogOpen(false);
+       }
+    }
+  }, [stopVideoStream, toast]);
+  
+  const handleDialogCameraOpenChange = (open: boolean) => {
+    setIsCameraDialogOpen(open);
+    if (open) {
+      handleClear();
+      startVideoStream();
+    } else {
+      stopVideoStream();
+    }
+  };
+  
+  const handleSwitchCamera = async () => {
+    if (availableCameras.length > 1) {
+      const nextCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
+      await startVideoStream(availableCameras[nextCameraIndex].deviceId);
+    }
+  };
+
+  const handleCaptureAndAnalyze = async () => {
+    if (!videoRef.current || !canvasRef.current || isLoading) return;
+    
+    setIsLoading(true); // Set loading state immediately
+    setCurrentAiTask("Capturando e analisando...");
+    
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext('2d');
+    
+    if (context) {
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUri = canvas.toDataURL('image/jpeg');
+      setPreviewUrl(dataUri);
+      
+      // Close camera dialog and start analysis
+      setIsCameraDialogOpen(false); 
+      stopVideoStream();
+      await handleAnalyze(dataUri); // Pass dataUri directly
+
+    } else {
+       toast({ title: "Erro ao Capturar", description: "Não foi possível processar a imagem da câmera.", variant: "destructive" });
+       setIsLoading(false); // Reset loading state on error
+       setCurrentAiTask(null);
+    }
+  };
+
+
   const handleClear = () => {
-    setSelectedFile(null);
-    if (previewUrl && previewUrl.startsWith("blob:")) {
+    if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
     }
     setPreviewUrl(null);
     resetResults();
-    if (isCameraDialogOpen) setIsCameraDialogOpen(false); 
     stopVideoStream();
     setHasCameraPermission(null);
-    setAvailableCameras([]);
-    setCurrentCameraIndex(0);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
   };
 
   return (
@@ -314,9 +222,9 @@ const FroApp: React.FC = () => {
         <CardContent className="p-6 space-y-6">
           
           <div className="p-4 border border-dashed border-border rounded-lg bg-muted/20 min-h-[250px] flex items-center justify-center">
-            {previewUrl ? (
+            {previewUrl && !isLoading ? (
                 <div className="w-full">
-                    <h3 className="text-xl font-headline mb-2 text-center">Prévia da Imagem</h3>
+                    <h3 className="text-xl font-headline mb-2 text-center">Planta a ser Analisada</h3>
                     <div className="relative w-full aspect-video max-h-[400px] rounded-md overflow-hidden shadow-md">
                         <Image 
                         src={previewUrl} 
@@ -329,16 +237,25 @@ const FroApp: React.FC = () => {
                 </div>
             ) : (
                 <div className="text-center text-muted-foreground">
-                    <ImageIcon size={48} className="mx-auto mb-2" />
-                    <p>A imagem capturada aparecerá aqui.</p>
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4" />
+                        <p>{currentAiTask || "Analisando..."}</p>
+                      </>
+                    ) : (
+                      <>
+                        <ImageIcon size={48} className="mx-auto mb-2" />
+                        <p>A imagem capturada aparecerá aqui.</p>
+                      </>
+                    )}
                 </div>
             )}
           </div>
           
           <Dialog open={isCameraDialogOpen} onOpenChange={handleDialogCameraOpenChange}>
             <DialogTrigger asChild>
-              <Button disabled={isLoading} className="w-full">
-                <Camera className="mr-2 h-5 w-5" /> Usar Câmera
+              <Button disabled={isLoading} className="w-full" size="lg">
+                <Camera className="mr-2 h-5 w-5" /> Iniciar Análise com a Câmera
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl p-4 h-auto max-h-[90vh] flex flex-col">
@@ -348,9 +265,7 @@ const FroApp: React.FC = () => {
               <div className="flex-grow overflow-hidden rounded-md border relative">
                 <video 
                   ref={videoRef} 
-                  className={cn(
-                    "w-full h-full object-cover"
-                  )}
+                  className={cn("w-full h-full object-cover")}
                   autoPlay 
                   playsInline 
                   muted 
@@ -358,7 +273,7 @@ const FroApp: React.FC = () => {
                  {hasCameraPermission === null && isCameraDialogOpen && ( 
                     <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    <p className="ml-2 text-foreground">Solicitando permissão da câmera...</p>
+                    <p className="ml-2 text-foreground">Iniciando câmera...</p>
                     </div>
                 )}
               </div>
@@ -377,81 +292,28 @@ const FroApp: React.FC = () => {
                       Cancelar
                     </Button>
                   </DialogClose>
-                  <Button onClick={handleCapturePhoto} disabled={isLoading || !hasCameraPermission}>
-                    {isLoading && currentAiTask === 'Capturando...' ? (
-                      <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Capturando...
-                      </>
-                    ) : (
-                      <>
-                        <Camera className="mr-2 h-5 w-5" /> Capturar Foto
-                      </>
-                    )}
+                  <Button onClick={handleCaptureAndAnalyze} disabled={isLoading || !hasCameraPermission}>
+                    <Camera className="mr-2 h-5 w-5" /> Capturar e Analisar
                   </Button>
                 </div>
               </DialogFooter>
             </DialogContent>
           </Dialog>
-
-          <Dialog open={showUploadFallback} onOpenChange={setShowUploadFallback}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Problema com a Câmera</DialogTitle>
-                <DialogDescription>
-                  Não foi possível acessar a câmera. Como alternativa, por favor, envie um arquivo de imagem do seu dispositivo.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="py-4 space-y-2">
-                <Label htmlFor="plant-photo-fallback">Enviar Foto da Planta</Label>
-                <Input
-                  id="plant-photo-fallback"
-                  ref={fileInputRef}
-                  type="file"
-                  onChange={handleFileChange}
-                  accept="image/*"
-                  className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
-                />
-              </div>
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button variant="outline">Fechar</Button>
-                </DialogClose>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
         </CardContent>
-        <CardFooter className="p-6 bg-secondary/50 flex flex-col sm:flex-row justify-between items-center gap-4">
-           <Button 
-            onClick={handleAnalyze} 
-            disabled={!previewUrl || isLoading || isCameraDialogOpen} 
-            size="lg"
-            className="w-full sm:w-auto"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                {currentAiTask || "Analisando..."}
-              </>
-            ) : (
-              <>
-                <Bot className="mr-2 h-5 w-5" />
-                Analisar com a Frô
-              </>
-            )}
-          </Button>
-          { (selectedFile || previewUrl) && (
-            <Button 
-              onClick={handleClear} 
-              variant="outline" 
-              size="lg"
-              className="w-full sm:w-auto"
-              disabled={isLoading}
-            >
-              <XCircle className="mr-2 h-5 w-5" /> Limpar Tudo
-            </Button>
-          )}
-        </CardFooter>
+
+        {(previewUrl || identification || healthAnalysis) && (
+            <CardFooter className="p-6 bg-secondary/50">
+                <Button 
+                onClick={handleClear} 
+                variant="outline" 
+                size="lg"
+                className="w-full"
+                disabled={isLoading}
+                >
+                <XCircle className="mr-2 h-5 w-5" /> Nova Análise
+                </Button>
+            </CardFooter>
+        )}
       </Card>
 
       {identification && (
@@ -502,3 +364,5 @@ const FroApp: React.FC = () => {
 };
 
 export default FroApp;
+
+    
